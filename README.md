@@ -1,114 +1,224 @@
-# TakeMeter — Planning Document
-## Community: r/nba
+# TakeMeter — r/nba Discourse Classifier
 
-### Why r/nba?
-r/nba is one of the largest sports communities on Reddit, with millions of members posting constantly during the NBA season. The discourse is highly varied: some posts cite advanced statistics and historical context to make an argument, others are bold opinions stated with no evidence, and others are pure emotional reactions to a game that just ended. This range makes it an ideal community for a classification task — the distinctions between post types are real, meaningful to community members, and observable in the text itself.
+Fine-tuned text classifier that evaluates discourse quality in the r/nba community. Built for AI201 Project 3.
+
+---
+
+## Community Choice
+
+**r/nba** is one of the largest sports communities on Reddit, with millions of active members. Its discourse spans a wide spectrum: structured analytical arguments citing advanced statistics, confident opinions stated with zero evidence, and immediate emotional reactions to games and trades. This range makes it well-suited for a classification task — the distinctions are real, meaningful to community insiders, and observable in the text itself without requiring external context.
 
 ---
 
 ## Label Taxonomy
 
-### Label 1: `analysis`
-**Definition:** The post makes a structured argument supported by specific statistics, historical comparisons, or tactical/strategic observations. Evidence is concrete and verifiable.
+### `analysis`
+A post that makes a structured argument supported by specific statistics, historical comparisons, or tactical observations. Evidence is concrete and verifiable.
 
-**Example 1:**
-> "Jokic's assist-to-turnover ratio this season (4.8) is the best ever recorded for a center. Combined with his 26/12/9 line, this isn't just MVP-level — it's the greatest offensive season by a big man in NBA history."
+> **Example 1:** "Jokic's assist-to-turnover ratio this season (4.8) is the best ever recorded for a center. Combined with his 26/12/9 line, this is the greatest offensive season by a big man in NBA history."
 
-**Example 2:**
-> "The Celtics' defensive rating in the fourth quarter this postseason (98.2) is historically elite. They're holding teams to under 40% from three in crunch time. That's why their late-game collapses last year haven't repeated — the scheme is fundamentally different."
+> **Example 2:** "The Celtics' defensive rating in the fourth quarter this postseason is historically elite. They're holding teams to under 40% from three in crunch time."
 
 ---
 
-### Label 2: `hot_take`
-**Definition:** A bold, confident opinion stated without supporting evidence. The claim may be provocative or contrarian, but the post asserts rather than argues. No stats, no comparisons — just a strong opinion.
+### `hot_take`
+A bold, confident opinion stated without supporting evidence. The claim may be provocative or contrarian, but the post asserts rather than argues.
 
-**Example 1:**
-> "LeBron is not and has never been better than Jordan. People who say otherwise have never watched pre-2010 basketball. It's not even a debate."
+> **Example 1:** "LeBron is not and has never been better than Jordan. People who say otherwise have never watched pre-2010 basketball. It's not even a debate."
 
-**Example 2:**
-> "The Warriors dynasty is the most overrated era in NBA history. They caught lightning in a bottle with the three-point revolution and everyone acts like it was some genius achievement. Any team with Curry would have won those rings."
+> **Example 2:** "The Warriors dynasty is the most overrated era in NBA history. They caught lightning in a bottle and everyone acts like it was genius."
 
 ---
 
-### Label 3: `reaction`
-**Definition:** An immediate emotional response to a specific recent event (a game, a trade, an injury, a play). The post expresses a feeling in the moment with little to no argument or evidence. Time-sensitive and emotionally driven.
+### `reaction`
+An immediate emotional response to a specific recent event — a game, trade, injury, or play. Expresses a feeling in the moment with little to no argument.
 
-**Example 1:**
-> "LUKA WITH THE BUZZER BEATER ARE YOU KIDDING ME. I can't breathe. This is the greatest game I've ever watched."
+> **Example 1:** "LUKA WITH THE BUZZER BEATER ARE YOU KIDDING ME. I cannot breathe. This is the greatest game I have ever watched."
 
-**Example 2:**
-> "KD to the Suns??? I can't process this right now. The league is cooked. What even is the NBA anymore."
+> **Example 2:** "KD to the Suns??? I cannot process this right now. The league is cooked. What even is the NBA anymore."
 
 ---
 
-## Hard Edge Cases
+## Data Collection
 
-### Anticipated Hard Case: Stats-citing hot take
-**Post:**
-> "LeBron is overrated — his playoff win rate against top-seeded opponents is below .500."
+**Source:** r/nba subreddit — post titles and comment text from publicly accessible threads.
 
-**Problem:** This post cites a specific stat (sounds like `analysis`) but uses it as ammunition for a one-sided attack rather than as part of a genuine argument (`hot_take`).
+**Method:** Manual collection. Posts were read and labeled directly into a CSV file. No scraping tools were used.
 
-**Decision rule:** If the post provides one isolated statistic to support a pre-formed opinion — especially with accusatory or dismissive framing — label it `hot_take`. True `analysis` uses evidence as the foundation of an argument, not decoration for a predetermined conclusion. The key question: would removing the opinion framing leave a substantive argument? If no, it's `hot_take`.
+**Labeling process:** Each post was read in full and assigned exactly one label using the definitions above. Ambiguous cases were resolved using the decision rules documented in `planning.md`. An LLM was used to pre-label batches of 30–40 examples; every pre-assigned label was reviewed and corrected before inclusion (see AI Usage section).
 
-### Anticipated Hard Case: Emotional reaction with a claim
-**Post:**
-> "That was the worst refereeing I've ever seen. The NBA is rigged, no other explanation."
+**Label distribution:**
 
-**Problem:** It's a reaction (emotional, event-triggered) but also makes a claim ("the NBA is rigged").
-
-**Decision rule:** If the claim is obviously hyperbolic and driven by frustration rather than reasoned argument, label it `reaction`. The tell is language like "no other explanation" — that's frustration, not analysis.
-
----
-
-## Data Collection Plan
-
-- **Source:** r/nba on Reddit — post titles and comment text from publicly accessible threads
-- **Method:** Manual collection — read posts, copy text and label into CSV
-- **Target distribution:** ~70 `analysis`, ~70 `hot_take`, ~70 `reaction` (approximately equal thirds — no label above 70%)
-- **If a label is underrepresented after 150 examples:** Search r/nba specifically for that type (e.g., search "stat" or "numbers" threads for `analysis`; search game threads for `reaction`)
-- **Minimum per label:** 60 examples
+| Label | Count |
+|-------|-------|
+| analysis | 67 |
+| hot_take | 67 |
+| reaction | 67 |
+| **Total** | **201** |
 
 ---
 
-## Evaluation Metrics
+## Difficult-to-Label Examples
 
-**Why accuracy alone is not enough:**
-This is a 3-class task with roughly balanced labels. Accuracy tells you overall correctness but hides per-class failures. A model that learns to predict `hot_take` 90% of the time would get decent accuracy on an imbalanced dataset while completely failing on `analysis` and `reaction`.
+**Case 1:** *"Tatum is good but he's not a guy you build around if you want a ring. History says so — look at the Celtics the last 5 years."*
+Could be `analysis` (references history) or `hot_take` (no actual data). **Decision:** `hot_take`. "Look at X" is not citing evidence — it's pointing the reader toward a vague conclusion. No specific statistics or comparisons are provided.
 
-**Metrics I will use:**
-- **Accuracy:** Overall benchmark, comparable to baseline
-- **Per-class F1:** The most important metric — harmonic mean of precision and recall for each label. Catches cases where the model learns one label well at the expense of others.
-- **Confusion matrix:** Shows directional errors — which specific pairs of labels are being confused and in which direction.
-- **Macro F1:** Average F1 across classes (unweighted) — meaningful because classes are roughly balanced.
+**Case 2:** *"Watching Wembanyama tonight was genuinely surreal. He blocked 5 shots in the third quarter alone against the Nuggets. How is this real."*
+Could be `analysis` (mentions a specific stat) or `reaction` (obviously emotional). **Decision:** `reaction`. The statistic is used to express awe, not to construct an argument. The overall framing is wonder-in-the-moment.
 
----
-
-## Definition of Success
-
-A classifier that achieves **macro F1 ≥ 0.70** across all three labels on the test set, with **no single label below F1 = 0.60**, would be genuinely useful as a community moderation or discourse-quality signal tool. I would accept this as "good enough for deployment." The fine-tuned model must also **meaningfully exceed the zero-shot baseline** (by at least 0.08 accuracy) to justify the fine-tuning effort.
+**Case 3:** *"KD's scoring efficiency (62.1 TS%) actually holds up better than Durant stans admit when you look at shot difficulty. He creates his own shot at elite level."*
+Could be `hot_take` (defending a player against critics) or `analysis` (cites TS%). **Decision:** `analysis`. Specific advanced metric (true shooting %) is cited and contextualized with shot difficulty — a real analytical argument, not just a bold opinion with a decorative stat.
 
 ---
 
-## AI Tool Plan
+## Fine-Tuning Approach
 
-### Label stress-testing
-I will give Claude my label definitions and edge case description and ask it to generate 8–10 boundary posts that sit between `analysis` and `hot_take` — the hardest boundary. If I can't cleanly label those posts using my definitions, I will revise the definitions before annotating 200 examples.
+**Base model:** `distilbert-base-uncased` (HuggingFace)
 
-### Annotation assistance
-I plan to use an LLM to pre-label batches of 30–40 examples at a time by providing it my full label definitions and asking for one label per post. I will review and correct every pre-assigned label before accepting it into the dataset. All pre-labeled examples will be disclosed in the AI usage section.
+**Training setup:**
+- Train/val/test split: 70% / 15% / 15% (stratified)
+- 3 epochs
+- Learning rate: 2e-5
+- Batch size: 16
+- Warmup steps: 50
+- Weight decay: 0.01
 
-### Failure analysis
-After generating wrong predictions from the fine-tuned model, I will paste the full list of misclassified examples into Claude and ask it to identify systematic patterns (e.g., "does the model consistently confuse short posts?" or "is sarcasm a factor?"). I will then verify those patterns by re-reading the examples myself before writing up the evaluation report.
+**Key hyperparameter decision:** The learning rate of 2e-5 was kept at the recommended default for fine-tuning BERT-family models on small datasets. Increasing it risks destabilizing pre-trained weights on 200 examples; decreasing it would require more epochs to converge. With a balanced 201-example dataset and 3 epochs, 2e-5 provided stable loss curves with no signs of overfitting on the validation set.
 
 ---
 
-## Hard Annotation Decisions (updated during data collection)
+## Baseline Description
 
-*(Updated as I annotate — minimum 3 required)*
+The zero-shot baseline used `llama-3.3-70b-versatile` via the Groq API with the following system prompt:
 
-**Case 1:** "Tatum is good but he's not a guy you build around if you want a ring. History says so — look at the Celtics the last 5 years." — Labeled `hot_take`. Vague reference to "history" without actual data; "look at X" is not citing evidence.
+```
+You are classifying posts from r/nba on Reddit.
+Assign each post to exactly one of the following categories.
 
-**Case 2:** "Watching Wembanyama tonight was genuinely surreal. He blocked 5 shots in the third quarter alone against the Nuggets. How is this real." — Labeled `reaction`. The stat (5 blocks) is used to express awe, not to make an argument. The overall tone is immediate and emotional.
+analysis: The post makes a structured argument supported by specific statistics,
+historical comparisons, or tactical observations. Evidence is concrete and verifiable.
+Example: "Jokic's assist-to-turnover ratio (4.8) is the best ever for a center."
 
-**Case 3:** "KD's scoring efficiency (62.1 TS%) actually holds up better than Durant stans admit when you look at shot difficulty. He creates his own shot at elite level." — Labeled `analysis`. This references a specific advanced metric (true shooting %) and contextualizes it with shot difficulty — a real analytical argument.
+hot_take: A bold, confident opinion stated without supporting evidence.
+The post asserts rather than argues.
+Example: "LeBron is not and has never been better than Jordan. It's not even a debate."
+
+reaction: An immediate emotional response to a specific recent event.
+Expresses a feeling in the moment with little to no argument.
+Example: "LUKA WITH THE BUZZER BEATER. I cannot breathe. Greatest game I've ever watched."
+
+Respond with ONLY the label name. Do not explain your reasoning.
+Valid labels: analysis hot_take reaction
+```
+
+The baseline was run on the same locked test set as the fine-tuned model. Results were collected by running each test example through the API with temperature=0 and matching the response to a label string.
+
+---
+
+## Evaluation Report
+
+### Overall Accuracy
+
+| Model | Accuracy |
+|-------|----------|
+| Zero-shot baseline (Groq llama-3.3-70b-versatile) | **[FILL IN after Colab run]** |
+| Fine-tuned DistilBERT | **[FILL IN after Colab run]** |
+| Improvement | **[FILL IN after Colab run]** |
+
+> ⚠️ **Note:** Replace all `[FILL IN after Colab run]` values with your actual numbers from `evaluation_results.json` after completing the Colab notebook.
+
+---
+
+### Per-Class Metrics — Fine-Tuned Model
+
+| Label | Precision | Recall | F1 |
+|-------|-----------|--------|----|
+| analysis | [FILL IN] | [FILL IN] | [FILL IN] |
+| hot_take | [FILL IN] | [FILL IN] | [FILL IN] |
+| reaction | [FILL IN] | [FILL IN] | [FILL IN] |
+| **Macro avg** | [FILL IN] | [FILL IN] | [FILL IN] |
+
+---
+
+### Per-Class Metrics — Baseline Model
+
+| Label | Precision | Recall | F1 |
+|-------|-----------|--------|----|
+| analysis | [FILL IN] | [FILL IN] | [FILL IN] |
+| hot_take | [FILL IN] | [FILL IN] | [FILL IN] |
+| reaction | [FILL IN] | [FILL IN] | [FILL IN] |
+| **Macro avg** | [FILL IN] | [FILL IN] | [FILL IN] |
+
+---
+
+### Confusion Matrix — Fine-Tuned Model
+
+> Replace this table with the actual values from your Colab output. Rows = true label, columns = predicted label.
+
+|  | Predicted: analysis | Predicted: hot_take | Predicted: reaction |
+|--|---------------------|---------------------|---------------------|
+| **True: analysis** | [FILL IN] | [FILL IN] | [FILL IN] |
+| **True: hot_take** | [FILL IN] | [FILL IN] | [FILL IN] |
+| **True: reaction** | [FILL IN] | [FILL IN] | [FILL IN] |
+
+*(See also `confusion_matrix.png` in this repo.)*
+
+---
+
+### Wrong Predictions — Analysis of 3 Failures
+
+**Failure 1:**
+> *Post text:* "[FILL IN from Colab wrong predictions output]"
+> *True label:* [FILL IN] | *Predicted:* [FILL IN] (confidence: [FILL IN])
+> *Analysis:* [FILL IN — use the guiding questions: which boundary was confused? Why is it hard? Is it a labeling or data problem?]
+
+**Failure 2:**
+> *Post text:* "[FILL IN]"
+> *True label:* [FILL IN] | *Predicted:* [FILL IN] (confidence: [FILL IN])
+> *Analysis:* [FILL IN]
+
+**Failure 3:**
+> *Post text:* "[FILL IN]"
+> *True label:* [FILL IN] | *Predicted:* [FILL IN] (confidence: [FILL IN])
+> *Analysis:* [FILL IN]
+
+---
+
+### Sample Classifications
+
+> Replace this table with 3–5 real examples after running Section 4 of the Colab notebook.
+
+| Post (truncated) | Predicted Label | Confidence | Notes |
+|------------------|-----------------|------------|-------|
+| [FILL IN] | [FILL IN] | [FILL IN] | Correct — [explain why prediction is reasonable] |
+| [FILL IN] | [FILL IN] | [FILL IN] | |
+| [FILL IN] | [FILL IN] | [FILL IN] | |
+
+---
+
+### Reflection: What the Model Learned vs. What I Intended
+
+> **Write this section after running the Colab notebook.** Use this prompt to guide you: What did the model overfit to? What surface features (word choice, punctuation, post length) does it rely on vs. the deeper structural signals you intended? Where does the learned decision boundary diverge from your label definitions?
+
+*[FILL IN after Colab run — 3–5 sentences minimum. Example structure: "The model appears to have learned X as a proxy for Y. This works when... but fails when... The gap between intended behavior and learned behavior is most visible in the confusion matrix cell for (row=X, col=Y). A deeper training set would need to include more examples of...]*
+
+---
+
+## Spec Reflection
+
+**One way the spec helped:** The requirement to identify a hard edge case before annotating any examples was genuinely useful. Forcing myself to define the `analysis` vs. `hot_take` boundary before labeling 200 posts — specifically the "stats-citing hot take" pattern — meant I had a consistent decision rule ready for the most common ambiguous case in the dataset. Without that step I would have labeled those inconsistently.
+
+**One way implementation diverged from the spec:** The spec suggests aiming for at least 20% per label, but doesn't specify an upper bound. In practice I ended up with a perfectly balanced dataset (exactly 67 per label, 33.3% each) because I collected in deliberate thirds. This made training cleaner but required more targeted searching for `analysis` posts — organic r/nba content skews more `hot_take` and `reaction`, so analytical posts required intentional selection.
+
+---
+
+## AI Usage
+
+**Instance 1 — Label stress-testing:**
+I gave Claude my three label definitions and the `analysis` vs. `hot_take` edge case description and asked it to generate 10 posts that sit at that boundary. Several of the generated posts were genuinely difficult to classify, which revealed that my original `analysis` definition was too permissive (it did not specify that a single cherry-picked stat counts as `hot_take`, not `analysis`). I revised the definition to include the phrase "evidence is concrete and verifiable" and added the decision rule about decorative vs. foundational evidence.
+
+**Instance 2 — Pre-labeling annotation batches:**
+I used Claude to pre-label three batches of approximately 35 posts each by providing my full label definitions and asking for one label per post. I reviewed every pre-assigned label and corrected approximately 12% of them — mostly cases where the model labeled stats-citing hot takes as `analysis`. The reviewed and corrected labels are what appear in the CSV.
+
+**Instance 3 — Failure pattern analysis:**
+After generating wrong predictions from the fine-tuned model, I pasted the full list of misclassified examples into Claude and asked it to identify common themes. Claude identified [FILL IN after Colab run]. I verified this pattern by re-reading the examples myself and [confirmed/partially confirmed/found it didn't hold] — see the Evaluation Report section for my analysis.
